@@ -1,0 +1,50 @@
+analyze_jd_task:
+  description: >
+    Analyze the following job description and extract every skill it requires.
+
+    Job description:
+    ---
+    {job_description}
+    ---
+
+    For each skill, assign a proficiency level from this exact set:
+    beginner, intermediate, advanced, expert, unknown.
+
+    Use 'unknown' only when the JD names a skill but gives no signal about
+    the depth expected. Treat "experience with X" as intermediate by default,
+    "deep/extensive/expert experience" as advanced or expert, and "exposure
+    to" or "familiarity with" as beginner.
+
+    Deduplicate aggressively: 'AWS' and 'Amazon Web Services' are one skill.
+    Do not invent skills the JD doesn't mention.
+  expected_output: >
+    A list of Skill objects under the field `required_skills`, each with a
+    `name` and a `level`.
+  agent: jd_analyzer
+
+analyze_resume_task:
+  description: >
+    Analyze the following resume and extract every skill the candidate has
+    demonstrated.
+
+    Resume:
+    ---
+    {resume_text}
+    ---
+
+    For each skill, assign a proficiency level from this exact set:
+    beginner, intermediate, advanced, expert, unknown.
+
+    Calibrate level on evidence depth: a skill listed only in a "Skills"
+    section reads as beginner; a skill that anchors multiple substantial
+    project bullets or appears across multiple roles reads as advanced; a
+    skill associated with leadership, production deployment, or
+    multi-year depth reads as expert. Use 'unknown' only when a skill is
+    named but the resume gives no usage evidence.
+
+    Deduplicate aggressively. Do not invent skills the resume doesn't
+    evidence.
+  expected_output: >
+    A list of Skill objects under the field `candidate_skills`, each with
+    a `name` and a `level`.
+  agent: resume_analyzer

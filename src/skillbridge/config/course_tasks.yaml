@@ -1,0 +1,47 @@
+research_courses_task:
+  description: >
+    Research online courses for each of the following skill gaps. You
+    MUST run one search per gap — if there are N gaps below, you must
+    run exactly N searches. Do not skip any gap. After the searches,
+    gather 3-5 candidate courses per gap with title, platform, URL,
+    and a brief description.
+
+    Skill gaps to research (priority order):
+    {gaps_summary}
+
+    Calibrate your search query to the target level — for a "beginner"
+    target search for "intro to X course", for "intermediate" or
+    "advanced" search for "X advanced course" or "X production course".
+    Skip blog posts, forums, and marketing pages — only actual courses.
+  expected_output: >
+    A structured list of candidate courses grouped by skill, including
+    title, platform, URL, and a short description for each. Plain text
+    or markdown is fine — the curator will format it into the final
+    schema. The output must cover every skill from the gap list above.
+  agent: course_researcher
+
+curate_courses_task:
+  description: >
+    Review the candidate courses from the researcher and output one
+    CourseRec for each skill gap in the original list.
+
+    CRITICAL: The number of CourseRec objects in your output MUST equal
+    the number of skill gaps. Do NOT merge gaps even if they look
+    related (e.g. LangChain, LangGraph, LangSmith are three separate
+    gaps and require three separate CourseRec entries — pick the best
+    course for each, even if the same course appears more than once).
+
+    Selection criteria, in order:
+    1. Depth matches the gap's target level
+    2. Platform reputation (DeepLearning.AI, Coursera, top-rated
+       Udemy, edX > smaller platforms > YouTube > blog tutorials)
+    3. Likely up-to-date (avoid titles containing "2018"/"2019")
+
+    For `duration` and `cost`, use the value from the search snippet
+    if present, otherwise "See course page". For `platform`, use the
+    canonical name (e.g. "Coursera", "DeepLearning.AI", "Udemy").
+  expected_output: >
+    A CourseRecommendations object with `recommendations` containing
+    exactly one CourseRec per skill gap from the input list. Output
+    length must match input length.
+  agent: course_curator
