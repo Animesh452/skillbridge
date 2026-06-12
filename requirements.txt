@@ -1,6 +1,8 @@
-crewai[tools,litellm]==1.14.7
+crewai[tools]==1.14.7
+litellm==1.88.1
+openai==2.41.1
+python-dotenv==1.2.2
 gradio>=6.0
 pypdf
 python-docx
-python-dotenv
 requests
