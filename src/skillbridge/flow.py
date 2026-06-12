@@ -17,6 +17,40 @@ from skillbridge.models import (
     SkillsAnalysis,
 )
 
+def _ensure_one_per_gap(
+    courses: list[CourseRec], gaps: list[SkillGap]
+) -> tuple[list[CourseRec], list[SkillGap]]:
+    """Enforce cardinality: one CourseRec per input gap.
+
+    Returns (kept, missing):
+      - kept: CourseRecs matching input gaps in gap order, deduped
+              (first-write-wins on duplicate skill names from the curator)
+      - missing: gaps with no matching CourseRec, to be re-invoked
+
+    Matching is by normalized (lowercased, stripped) skill name. Extras
+    in the curator output (skill names that don't match any input gap)
+    are silently dropped. The canonical skill name from the input gap
+    is written onto the matched CourseRec for clean reporting.
+    """
+    by_name: dict[str, CourseRec] = {}
+    for c in courses:
+        key = c.skill.strip().lower()
+        if key not in by_name:  # first-write-wins
+            by_name[key] = c
+
+    kept: list[CourseRec] = []
+    missing: list[SkillGap] = []
+    for g in gaps:
+        key = g.skill.strip().lower()
+        if key in by_name:
+            matched = by_name[key]
+            matched.skill = g.skill  # canonicalize for the report
+            kept.append(matched)
+        else:
+            missing.append(g)
+
+    return kept, missing
+
 
 class SkillBridgeState(BaseModel):
     """Flow state carried through all steps."""
@@ -68,9 +102,10 @@ class SkillBridgeFlow(Flow[SkillBridgeState]):
     def recommend_courses(self) -> None:
         """Crew 2 — research and curate one course per gap.
 
-        Sleeps 30s before kicking off Crew 2 so the Groq 70B TPM bucket
-        refills after Crew 1. Curator stays on 70B to preserve judgment
-        quality on platform/depth ranking. See README for rate-limit notes.
+        LLM output cardinality is unreliable on free-tier models — the curator
+        sometimes merges related gaps (under-count) or invents extras
+        (over-count). Python-side validation enforces exactly one CourseRec
+        per input gap, re-invoking the crew for any miss.
         """
         if not self.state.gaps:
             self.state.courses = []
@@ -79,7 +114,22 @@ class SkillBridgeFlow(Flow[SkillBridgeState]):
         result = CourseRecommendationCrew().crew().kickoff(inputs={
             "gaps_summary": format_gaps_for_research(self.state.gaps),
         })
-        self.state.courses = result.pydantic.recommendations
+        courses = list(result.pydantic.recommendations)
+        kept, missing = _ensure_one_per_gap(courses, self.state.gaps)
+
+        # Re-invoke for any gap the curator missed. Each re-invoke is one
+        # full crew run (researcher + curator) on a single-gap input.
+        for gap in missing:
+            retry = CourseRecommendationCrew().crew().kickoff(inputs={
+                "gaps_summary": format_gaps_for_research([gap]),
+            })
+            retry_courses = retry.pydantic.recommendations
+            if retry_courses:
+                c = retry_courses[0]
+                c.skill = gap.skill
+                kept.append(c)
+
+        self.state.courses = kept
 
     @listen(recommend_courses)
     def format_report(self) -> None:
