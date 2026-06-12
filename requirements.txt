@@ -1,5 +1,5 @@
 crewai[tools,litellm]==1.14.7
-gradio>=5.0
+gradio>=6.0
 pypdf
 python-docx
 python-dotenv
